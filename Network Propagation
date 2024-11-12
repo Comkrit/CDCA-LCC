@@ -1,0 +1,80 @@
+#R Code for Netpropagation: the process follows a random walk with restart
+
+library(igraph, quietly = TRUE)
+nw1.2 <- read.csv("CancerSubnetwork1.2.csv", header = F)
+network1.2 <- graph_from_data_frame(nw1.2, directed = F)
+A <- get.adjacency(network1.2)
+
+#install.packages("readxl")
+library(readxl)
+FINAL_TDM <- read_xlsx(path = "final_TDM.xlsx")
+nodes <- read.csv("2100Nodes.csv", header = F)
+DrugCombID <- read.csv("607DrugCombID.csv", header = F)
+
+Edf <- data.frame(matrix(ncol = nrow(FINAL_TDM), nrow = nrow(A)))
+colnames(Edf) <- DrugCombID[,1]
+rownames(Edf) <- nodes[,1]
+
+for (loop in 1:nrow(FINAL_TDM)){
+
+  outdegree <- function(A)
+  {
+  	outdegree <- c()
+  	for( i in 1:nrow(A) )
+  	{
+  		outdegree <- c( outdegree, sum(A[i,]) )	
+  	}
+  	return(outdegree)
+  }
+  
+  diag(outdegree(A), nrow=nrow(A), ncol=nrow(A)) -> D
+  
+  x0a <- matrix(0, nrow=nrow(A), ncol=1)
+  x0b <- matrix(0, nrow=nrow(A), ncol=1)
+  
+  library(expm)
+  
+  a <- 0.5 # alpha parameter
+  I <- diag(nrow(A))
+  
+  #assign "0.5" values of x0a matrix
+  
+  CBTDM <- paste(FINAL_TDM[loop,4], sep = ",")
+  
+  STDM <- strsplit(CBTDM,split = ",")
+  
+  MTCTDM <- matrix(unlist(STDM))
+  
+  nMT <- nrow(MTCTDM)
+  
+  for (nmt in 1:nMT) {
+    x0a[strtoi(MTCTDM[nmt,1]),1] <- (0.5/nMT)
+  }
+  
+  #assign "0.5" values of x0b matrix
+  
+  CBTDM <- paste(FINAL_TDM[loop,7], sep = ",")
+  
+  STDM <- strsplit(CBTDM,split = ",")
+  
+  MTCTDM <- matrix(unlist(STDM))
+  
+  nMT <- nrow(MTCTDM)
+  
+  for (nmt in 1:nMT) {
+    x0b[strtoi(MTCTDM[nmt,1]),1] <- (0.5/nMT)
+  }
+  
+  x0 <- x0a+x0b
+  
+  Result <- (a * solve(I - ((1-a) * matrix(( A %*% solve(D) ), nrow = nrow(A))))) %*% x0
+  
+  Result.df <- as.data.frame(as.matrix(Result))
+  
+  Edf[,loop] <- Result.df[,1]
+  
+  print(paste("Please waiting...", loop, "/", nrow(FINAL_TDM)))
+
+}
+
+write.csv(Edf, "C:\\Users\\NetPopResult.alpha0.5.csv", row.names=T)
